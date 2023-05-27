@@ -5,37 +5,63 @@
       flake = false;
       url = "github:cargo-generate/cargo-generate";
     };
+    devenv = {
+      inputs.flake-compat.follows = "flake-compat";
+      inputs.nixpkgs.follows = "nixpkgs";
+      url = "github:cachix/devenv";
+    };
+    flake-compat = {
+      flake = false;
+      url = "github:edolstra/flake-compat";
+    };
+    flake-parts = {
+      inputs.nixpkgs-lib.follows = "nixpkgs";
+      url = "github:hercules-ci/flake-parts";
+    };
     nci = {
       inputs.nixpkgs.follows = "nixpkgs";
       url = "github:yusdacra/nix-cargo-integration";
     };
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    nix-filter.url = "github:numtide/nix-filter";
+    nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
   };
   outputs = inputs: let
-    name = "cargo-generate";
-    pkgs = common: packages: builtins.map (element: common.pkgs.${element}) packages;
-  in
-    inputs.nci.lib.makeOutputs {
-      config = common: {
-        outputs = {
-          defaults = {
-            app = name;
-            package = name;
-          };
-        };
-        runtimeLibs = pkgs common ["openssl"];
+      name = "cargo-generate";
+    in inputs.flake-parts.lib.mkFlake {inherit inputs;} {
+      debug = true;
+      imports = builtins.map (item: inputs.${item}.flakeModule) ["devenv" "nci"];
+      nci.source = (import inputs.nix-filter) {
+        root = inputs.${name};
+        include = ["Cargo.lock" "Cargo.toml" "README.md" "src"];
       };
-      pkgConfig = common: let
-        override.overrideAttrs = old: {buildInputs = (old.buildInputs or []) ++ pkgs common ["openssl" "perl" "pkg-config"];};
+      perSystem = {
+        config,
+        self',
+        inputs',
+        pkgs,
+        system,
+        ...
+      }: let
+        crate_outputs = config.nci.outputs.${name};
+        override.overrideAttrs = old: {buildInputs = (old.buildInputs or []) ++ pkgs.lib.attrsets.attrVals ["libgit2" "openssl" "perl" "pkg-config"] pkgs;};
       in {
-        ${name} = {
-          app = true;
-          build = true;
-          depsOverrides = {inherit override;};
-          overrides = {inherit override;};
-          profiles = {release = false;};
+        devenv.shells.default = {
+          languages.rust.enable = true;
+          packages = [config.packages.default];
         };
+        nci.projects.${name}.relPath = "";
+        nci.crates.${name} = {
+          depsOverrides = {inherit override;};
+          export = true;
+          overrides = {inherit override;};
+          profiles.release = {
+            noDefaultFeatures = true;
+            runTests = false;
+          };
+          runtimeLibs = pkgs.lib.attrsets.attrVals ["libgit2" "openssl"] pkgs;
+        };
+        packages.default = crate_outputs.packages.release;
       };
-      root = inputs.${name};
+      systems = ["x86_64-linux" "aarch64-darwin"];
     };
 }
