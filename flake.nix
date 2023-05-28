@@ -24,7 +24,7 @@
     };
     nci = {
       inputs.nixpkgs.follows = "nixpkgs";
-      url = "github:nothingnesses/nix-cargo-integration/features";
+      url = "github:yusdacra/nix-cargo-integration";
     };
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
   };

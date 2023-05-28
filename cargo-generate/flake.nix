@@ -55,7 +55,7 @@
           export = true;
           overrides = {inherit override;};
           profiles.release = {
-            noDefaultFeatures = true;
+            features = [];
             runTests = false;
           };
           runtimeLibs = pkgs.lib.attrsets.attrVals ["libgit2" "openssl"] pkgs;
